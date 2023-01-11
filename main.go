@@ -45,6 +45,7 @@ var replaceTable = strings.NewReplacer(
 	"]", "\\]",
 )
 
+var ymd = map[string]map[string]map[string]void{}
 var created = map[string]void{}
 
 func readTweetJSON(r io.Reader, root, dateFormat, user string) error {
@@ -99,6 +100,18 @@ func readTweetJSON(r io.Reader, root, dateFormat, user string) error {
 			fmt.Fprintf(fd, "### %s/%s/%s (%d tweets)\n\n",
 				year, month, mday, len(tweets))
 		}
+		monthMap, ok := ymd[year]
+		if !ok {
+			monthMap = map[string]map[string]void{}
+			ymd[year] = monthMap
+		}
+		dayMap, ok := monthMap[month]
+		if !ok {
+			dayMap = map[string]void{}
+			monthMap[month] = dayMap
+		}
+		dayMap[mday] = void{}
+
 		for i := len(tweets) - 1; i >= 0; i-- {
 			tw := tweets[i]
 			text := tw.Text
@@ -191,6 +204,18 @@ func mains(args []string) error {
 			if err != nil {
 				return fmt.Errorf("%s: %w", f.Name, err)
 			}
+		}
+	}
+	for y := sortedkeys.New(ymd); y.Range(); {
+		fmt.Printf("### %s\n\n", y.Key)
+		for m := sortedkeys.New(y.Value); m.Range(); {
+			fmt.Printf("* %s", m.Key)
+			dem := '|'
+			for d := sortedkeys.New(m.Value); d.Range(); {
+				fmt.Printf("%c[%s](%s.md)", dem, d.Key, path.Join(y.Key, m.Key, d.Key))
+				dem = ' '
+			}
+			fmt.Println()
 		}
 	}
 	return nil
