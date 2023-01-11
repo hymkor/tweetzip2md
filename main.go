@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,14 +16,26 @@ import (
 	"github.com/hymkor/go-sortedkeys"
 )
 
+type void = struct{}
+
+type Account struct {
+	Account struct {
+		UserName string `json:"username"`
+	} `json:"account"`
+}
+
+type User struct {
+	ScreenName string `json:"screen_name"`
+}
+
 type Tweet struct {
 	Text            string `json:"text"`
+	FullText        string `json:"full_text"`
 	IdStr           string `json:"id_str"`
 	CreatedAt       string `json:"created_at"`
 	RetweetedStatus *Tweet `json:"retweeted_status"`
+	User            *User  `json:"user"`
 }
-
-var dateFormat = "2006-01-02 15:04:05 -0700"
 
 var replaceTable = strings.NewReplacer(
 	"\n", "  \n",
@@ -32,15 +45,10 @@ var replaceTable = strings.NewReplacer(
 	"]", "\\]",
 )
 
-var created = map[string]struct{}{}
+var created = map[string]void{}
 
-func tryOneMonth(r io.Reader, root string) error {
-	br := bufio.NewReader(r)
-	_, err := br.ReadString('\n')
-	if err != nil {
-		return fmt.Errorf("Skip Header: %w", err)
-	}
-	bin, err := io.ReadAll(br)
+func readTweetJSON(r io.Reader, root, dateFormat, user string) error {
+	bin, err := io.ReadAll(r)
 	if err != nil {
 		return err
 	}
@@ -93,21 +101,75 @@ func tryOneMonth(r io.Reader, root string) error {
 		}
 		for i := len(tweets) - 1; i >= 0; i-- {
 			tw := tweets[i]
-			text := replaceTable.Replace(tw.Text)
+			text := tw.Text
+			if text == "" {
+				text = tw.FullText
+			}
+			text = replaceTable.Replace(text)
 			stamp, err := time.Parse(dateFormat, tw.CreatedAt)
 			if err != nil {
 				fd.Close()
 				return err
 			}
+			var url string
+			if tw.User != nil {
+				url = fmt.Sprintf("https://twitter.com/%s/status/%s",
+					tw.User.ScreenName, tw.IdStr)
+			} else {
+				url = fmt.Sprintf("https://twitter.com/%s/status/%s",
+					user, tw.IdStr)
+			}
 			stamp = stamp.Local()
-			fmt.Fprintf(fd, "%s  \n(%v)\n\n", text, stamp)
+			fmt.Fprintf(fd, "%s  \n[%v](%s)\n\n", text, stamp, url)
 		}
 		fd.Close()
 	}
 	return nil
 }
 
+func readTweetJs(f *zip.File, skipChar byte, root, dateFormat, user string) error {
+	rc, err := f.Open()
+	if err != nil {
+		return err
+	}
+	defer rc.Close()
+
+	br := bufio.NewReader(rc)
+	_, err = br.ReadString(skipChar)
+	if err != nil {
+		return err
+	}
+	return readTweetJSON(br, ".", dateFormat, user)
+}
+
+func readAccountJs(f *zip.File) (string, error) {
+	rc, err := f.Open()
+	if err != nil {
+		return "", err
+	}
+	defer rc.Close()
+	br := bufio.NewReader(rc)
+	_, err = br.ReadString('=')
+	if err != nil {
+		return "", err
+	}
+	bin, err := io.ReadAll(br)
+	if err != nil {
+		return "", err
+	}
+	account := []*Account{}
+	err = json.Unmarshal(bin, &account)
+	if err != nil {
+		return "", err
+	}
+	if len(account) >= 1 {
+		return account[0].Account.UserName, nil
+	}
+	return "", errors.New("UserName not found")
+}
+
 func mains(args []string) error {
+	var username string
 	for _, arg1 := range args {
 		z, err := zip.OpenReader(arg1)
 		if err != nil {
@@ -116,20 +178,18 @@ func mains(args []string) error {
 		defer z.Close()
 
 		for _, f := range z.File {
-			if path.Dir(f.Name) != "data/js/tweets" {
-				continue
-			}
 			if path.Ext(f.Name) != ".js" {
 				continue
 			}
-			rc, err := f.Open()
-			if err != nil {
-				return fmt.Errorf("%s/%s: %w", arg1, f.Name, err)
+			if f.Name == "account.js" {
+				username, err = readAccountJs(f)
+			} else if path.Dir(f.Name) == "data/js/tweets" {
+				err = readTweetJs(f, '\n', ".", "2006-01-02 15:04:05 -0700", username)
+			} else if f.Name == "tweet.js" {
+				err = readTweetJs(f, '=', ".", "Mon Jan 02 15:04:05 -0700 2006", username)
 			}
-			err = tryOneMonth(rc, ".")
-			rc.Close()
 			if err != nil {
-				return fmt.Errorf("%s/%s: %w", arg1, f.Name, err)
+				return fmt.Errorf("%s: %w", f.Name, err)
 			}
 		}
 	}
