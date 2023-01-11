@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hymkor/go-sortedkeys"
+	"github.com/tidwall/btree"
 )
 
 type void = struct{}
@@ -45,7 +45,7 @@ var replaceTable = strings.NewReplacer(
 	"]", "\\]",
 )
 
-var ymd = map[string]map[string]map[string]void{}
+var ymd btree.Map[string, *btree.Map[string, *btree.Set[string]]]
 var created = map[string]void{}
 
 func readTweetJSON(r io.Reader, root, dateFormat, user string) error {
@@ -59,7 +59,7 @@ func readTweetJSON(r io.Reader, root, dateFormat, user string) error {
 		return err
 	}
 
-	stock := map[string][]Tweet{}
+	var stock btree.Map[string, []Tweet]
 
 	for _, tw := range tweets {
 		if tw.RetweetedStatus != nil {
@@ -71,11 +71,14 @@ func readTweetJSON(r io.Reader, root, dateFormat, user string) error {
 		}
 		stamp = stamp.Local()
 		key := fmt.Sprintf("%04d%02d%02d", stamp.Year(), stamp.Month(), stamp.Day())
-		stock[key] = append(stock[key], tw)
+		stock1, _ := stock.Get(key)
+		stock1 = append(stock1, tw)
+		stock.Set(key, stock1)
 	}
-	for p := sortedkeys.New(stock); p.Range(); {
-		dt := p.Key
-		tweets := p.Value
+	iter := stock.Iter()
+	for ok := iter.First(); ok; ok = iter.Next() {
+		dt := iter.Key()
+		tweets := iter.Value()
 
 		year := dt[:4]
 		month := dt[4:6]
@@ -100,17 +103,17 @@ func readTweetJSON(r io.Reader, root, dateFormat, user string) error {
 			fmt.Fprintf(fd, "### %s/%s/%s (%d tweets)\n\n",
 				year, month, mday, len(tweets))
 		}
-		monthMap, ok := ymd[year]
+		monthMap, ok := ymd.Get(year)
 		if !ok {
-			monthMap = map[string]map[string]void{}
-			ymd[year] = monthMap
+			monthMap = new(btree.Map[string, *btree.Set[string]])
+			ymd.Set(year, monthMap)
 		}
-		dayMap, ok := monthMap[month]
+		dayMap, ok := monthMap.Get(month)
 		if !ok {
-			dayMap = map[string]void{}
-			monthMap[month] = dayMap
+			dayMap = new(btree.Set[string])
+			monthMap.Set(month, dayMap)
 		}
-		dayMap[mday] = void{}
+		dayMap.Insert(mday)
 
 		for i := len(tweets) - 1; i >= 0; i-- {
 			tw := tweets[i]
@@ -218,16 +221,19 @@ func mains(args []string) error {
 			}
 		}
 	}
-	for y := sortedkeys.New(ymd); y.Descend(); {
-		fmt.Printf("### %s\n\n", y.Key)
-		for m := sortedkeys.New(y.Value); m.Descend(); {
-			fmt.Printf("* %s |", m.Key)
-			for d := sortedkeys.New(m.Value); d.Range(); {
-				fmt.Printf(" [%s](%s.md)", d.Key, path.Join(y.Key, m.Key, d.Key))
-			}
+	ymd.Reverse(func(y string, ms *btree.Map[string, *btree.Set[string]]) bool {
+		fmt.Printf("### %s\n\n", y)
+		ms.Reverse(func(m string, ds *btree.Set[string]) bool {
+			fmt.Printf("* %s |", m)
+			ds.Scan(func(d string) bool {
+				fmt.Printf(" [%s](%s.md)", d, path.Join(y, m, d))
+				return true
+			})
 			fmt.Println()
-		}
-	}
+			return true
+		})
+		return true
+	})
 	return nil
 }
 
