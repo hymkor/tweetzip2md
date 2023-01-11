@@ -181,28 +181,40 @@ func readAccountJs(f *zip.File) (string, error) {
 	return "", errors.New("UserName not found")
 }
 
-func mains(args []string) error {
+func readZip(zipFname string) error {
+	z, err := zip.OpenReader(zipFname)
+	if err != nil {
+		return err
+	}
+	defer z.Close()
 	var username string
-	for _, arg1 := range args {
-		z, err := zip.OpenReader(arg1)
-		if err != nil {
-			return err
+	for _, f := range z.File {
+		if path.Ext(f.Name) != ".js" {
+			continue
 		}
-		defer z.Close()
+		if f.Name == "account.js" {
+			username, err = readAccountJs(f)
+		} else if path.Dir(f.Name) == "data/js/tweets" {
+			err = readTweetJs(f, '\n', ".", "2006-01-02 15:04:05 -0700", username)
+		} else if f.Name == "tweet.js" {
+			err = readTweetJs(f, '=', ".", "Mon Jan 02 15:04:05 -0700 2006", username)
+		}
+		if err != nil {
+			return fmt.Errorf("%s: %w", f.Name, err)
+		}
+	}
+	return nil
+}
 
-		for _, f := range z.File {
-			if path.Ext(f.Name) != ".js" {
-				continue
-			}
-			if f.Name == "account.js" {
-				username, err = readAccountJs(f)
-			} else if path.Dir(f.Name) == "data/js/tweets" {
-				err = readTweetJs(f, '\n', ".", "2006-01-02 15:04:05 -0700", username)
-			} else if f.Name == "tweet.js" {
-				err = readTweetJs(f, '=', ".", "Mon Jan 02 15:04:05 -0700 2006", username)
-			}
-			if err != nil {
-				return fmt.Errorf("%s: %w", f.Name, err)
+func mains(args []string) error {
+	for _, arg1 := range args {
+		fnames, err := filepath.Glob(arg1)
+		if err != nil {
+			fnames = []string{arg1}
+		}
+		for _, fn := range fnames {
+			if err := readZip(fn); err != nil {
+				return err
 			}
 		}
 	}
