@@ -1,11 +1,13 @@
 package main
 
 import (
+	"archive/zip"
 	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -105,8 +107,37 @@ func tryOneMonth(r io.Reader, root string) error {
 	return nil
 }
 
+func mains(args []string) error {
+	for _, arg1 := range args {
+		z, err := zip.OpenReader(arg1)
+		if err != nil {
+			return err
+		}
+		defer z.Close()
+
+		for _, f := range z.File {
+			if path.Dir(f.Name) != "data/js/tweets" {
+				continue
+			}
+			if path.Ext(f.Name) != ".js" {
+				continue
+			}
+			rc, err := f.Open()
+			if err != nil {
+				return fmt.Errorf("%s/%s: %w", arg1, f.Name, err)
+			}
+			err = tryOneMonth(rc, ".")
+			rc.Close()
+			if err != nil {
+				return fmt.Errorf("%s/%s: %w", arg1, f.Name, err)
+			}
+		}
+	}
+	return nil
+}
+
 func main() {
-	if err := tryOneMonth(os.Stdin, "."); err != nil {
+	if err := mains(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
