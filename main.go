@@ -218,14 +218,12 @@ func mains(args []string) error {
 			}
 		}
 	}
-	for y := sortedkeys.New(ymd); y.Range(); {
+	for y := sortedkeys.New(ymd); y.Descend(); {
 		fmt.Printf("### %s\n\n", y.Key)
-		for m := sortedkeys.New(y.Value); m.Range(); {
-			fmt.Printf("* %s", m.Key)
-			dem := '|'
+		for m := sortedkeys.New(y.Value); m.Descend(); {
+			fmt.Printf("* %s |", m.Key)
 			for d := sortedkeys.New(m.Value); d.Range(); {
-				fmt.Printf("%c[%s](%s.md)", dem, d.Key, path.Join(y.Key, m.Key, d.Key))
-				dem = ' '
+				fmt.Printf(" [%s](%s.md)", d.Key, path.Join(y.Key, m.Key, d.Key))
 			}
 			fmt.Println()
 		}
