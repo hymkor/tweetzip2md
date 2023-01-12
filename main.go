@@ -115,8 +115,7 @@ func readTweetJSON(r io.Reader, root, dateFormat, user string) error {
 		}
 		dayMap.Insert(mday)
 
-		for i := len(tweets) - 1; i >= 0; i-- {
-			tw := tweets[i]
+		for _, tw := range tweets {
 			text := tw.Text
 			if text == "" {
 				text = tw.FullText
