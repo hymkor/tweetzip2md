@@ -65,12 +65,14 @@ func readTweetJSON(r io.Reader, root, dateFormat, user string) error {
 	var stock btree.Map[string, []Tweet]
 
 	for _, tw := range tweets {
-		if id, err := strconv.ParseUint(tw.IdStr, 10, 64); err == nil {
-			if _, ok := doneTweet[id]; ok {
-				continue
-			}
-			doneTweet[id] = void{}
+		id64, err := strconv.ParseUint(tw.IdStr, 10, 64)
+		if err != nil {
+			return fmt.Errorf("id_str:\"%s\": %w\n", tw.IdStr, err)
 		}
+		if _, ok := doneTweet[id64]; ok {
+			continue
+		}
+		doneTweet[id64] = void{}
 		stamp, err := time.Parse(dateFormat, tw.CreatedAt)
 		if err != nil {
 			return err
