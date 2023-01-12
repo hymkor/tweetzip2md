@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -161,7 +162,7 @@ func readTweetJs(f *zip.File, skipChar byte, root, dateFormat, user string) erro
 	if err != nil {
 		return err
 	}
-	return readTweetJSON(br, ".", dateFormat, user)
+	return readTweetJSON(br, root, dateFormat, user)
 }
 
 func readAccountJs(f *zip.File) (string, error) {
@@ -190,7 +191,7 @@ func readAccountJs(f *zip.File) (string, error) {
 	return "", errors.New("UserName not found")
 }
 
-func readZip(zipFname string) error {
+func readZip(zipFname, root string) error {
 	z, err := zip.OpenReader(zipFname)
 	if err != nil {
 		return err
@@ -204,9 +205,9 @@ func readZip(zipFname string) error {
 		if f.Name == "account.js" {
 			username, err = readAccountJs(f)
 		} else if path.Dir(f.Name) == "data/js/tweets" {
-			err = readTweetJs(f, '\n', ".", "2006-01-02 15:04:05 -0700", username)
+			err = readTweetJs(f, '\n', root, "2006-01-02 15:04:05 -0700", username)
 		} else if f.Name == "tweet.js" {
-			err = readTweetJs(f, '=', ".", "Mon Jan 02 15:04:05 -0700 2006", username)
+			err = readTweetJs(f, '=', root, "Mon Jan 02 15:04:05 -0700 2006", username)
 		}
 		if err != nil {
 			return fmt.Errorf("%s: %w", f.Name, err)
@@ -215,6 +216,10 @@ func readZip(zipFname string) error {
 	return nil
 }
 
+var flagDir = flag.String("d", ".", "root directory to output")
+
+var flagBlobMaster = flag.String("b", ".", "relative path from index to each markdown")
+
 func mains(args []string) error {
 	for _, arg1 := range args {
 		fnames, err := filepath.Glob(arg1)
@@ -222,7 +227,7 @@ func mains(args []string) error {
 			fnames = []string{arg1}
 		}
 		for _, fn := range fnames {
-			if err := readZip(fn); err != nil {
+			if err := readZip(fn, *flagDir); err != nil {
 				return err
 			}
 		}
@@ -232,7 +237,7 @@ func mains(args []string) error {
 		ms.Reverse(func(m string, ds *btree.Set[string]) bool {
 			fmt.Printf("* %s |", m)
 			ds.Scan(func(d string) bool {
-				fmt.Printf(" [%s](%s.md)", d, path.Join(y, m, d))
+				fmt.Printf(" [%s](%s.md)", d, path.Join(*flagBlobMaster, y, m, d))
 				return true
 			})
 			fmt.Println()
@@ -244,7 +249,8 @@ func mains(args []string) error {
 }
 
 func main() {
-	if err := mains(os.Args[1:]); err != nil {
+	flag.Parse()
+	if err := mains(flag.Args()); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
