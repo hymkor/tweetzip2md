@@ -103,7 +103,8 @@ func readTweetJSON(r io.Reader, root, dateFormat, user string) error {
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(os.Stderr, "%s: reopened\n", filepath.ToSlash(articlePath))
+			fmt.Fprintf(os.Stderr, "%s: reopened(for %d tweets)\n",
+				filepath.ToSlash(articlePath), len(tweets))
 		} else {
 			fd, err = os.Create(articlePath)
 			if err != nil {
