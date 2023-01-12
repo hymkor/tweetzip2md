@@ -135,7 +135,7 @@ func readTweetJSON(r io.Reader, root, dateFormat, user string) error {
 					user, tw.IdStr)
 			}
 			stamp = stamp.Local()
-			fmt.Fprintf(fd, "%s  \n[%v](%s)\n\n", text, stamp, url)
+			fmt.Fprintf(fd, "%s  \n*[%v](%s)*\n\n", text, stamp, url)
 		}
 		fd.Close()
 	}
