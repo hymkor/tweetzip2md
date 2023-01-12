@@ -87,7 +87,7 @@ func readTweetJSON(r io.Reader, root, dateFormat, user string) error {
 		ymPath := filepath.Join(root, year, month)
 		os.MkdirAll(ymPath, 666)
 		articlePath := filepath.Join(ymPath, mday) + ".md"
-		fmt.Fprintln(os.Stderr, filepath.ToSlash(articlePath))
+		//fmt.Fprintln(os.Stderr, filepath.ToSlash(articlePath))
 
 		var fd *os.File
 		if _, ok := created[articlePath]; ok {
