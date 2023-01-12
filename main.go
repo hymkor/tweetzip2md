@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,7 +47,8 @@ var replaceTable = strings.NewReplacer(
 )
 
 var ymd btree.Map[string, *btree.Map[string, *btree.Set[string]]]
-var created = map[string]void{}
+var createdFile = map[string]void{}
+var doneTweet = map[uint64]void{}
 
 func readTweetJSON(r io.Reader, root, dateFormat, user string) error {
 	bin, err := io.ReadAll(r)
@@ -62,8 +64,11 @@ func readTweetJSON(r io.Reader, root, dateFormat, user string) error {
 	var stock btree.Map[string, []Tweet]
 
 	for _, tw := range tweets {
-		if tw.RetweetedStatus != nil {
-			//continue
+		if id, err := strconv.ParseUint(tw.IdStr, 10, 64); err == nil {
+			if _, ok := doneTweet[id]; ok {
+				continue
+			}
+			doneTweet[id] = void{}
 		}
 		stamp, err := time.Parse(dateFormat, tw.CreatedAt)
 		if err != nil {
@@ -90,11 +95,12 @@ func readTweetJSON(r io.Reader, root, dateFormat, user string) error {
 		//fmt.Fprintln(os.Stderr, filepath.ToSlash(articlePath))
 
 		var fd *os.File
-		if _, ok := created[articlePath]; ok {
-			fd, err = os.OpenFile(articlePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if _, ok := createdFile[articlePath]; ok {
+			fd, err = os.OpenFile(articlePath, os.O_APPEND|os.O_WRONLY, 0644)
 			if err != nil {
 				return err
 			}
+			fmt.Fprintf(os.Stderr, "%s: reopened\n", filepath.ToSlash(articlePath))
 		} else {
 			fd, err = os.Create(articlePath)
 			if err != nil {
@@ -102,6 +108,7 @@ func readTweetJSON(r io.Reader, root, dateFormat, user string) error {
 			}
 			fmt.Fprintf(fd, "### %s/%s/%s (%d tweets)\n\n",
 				year, month, mday, len(tweets))
+			createdFile[articlePath] = void{}
 		}
 		monthMap, ok := ymd.Get(year)
 		if !ok {
