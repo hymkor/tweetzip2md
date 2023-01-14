@@ -43,6 +43,8 @@ type Tweet struct {
 var (
 	flagDir        = flag.String("d", ".", "root directory to output")
 	flagBlobMaster = flag.String("b", ".", "relative path from index to each markdown")
+	flagShowDate   = flag.Bool("show-reopen-date", false, "show date on opening for append")
+	flagShowSource = flag.Bool("show-source-name", false, "show source JSON in zip-file")
 )
 
 var replaceTable = strings.NewReplacer(
@@ -104,7 +106,6 @@ func readTweetJSON(r io.Reader, root, dateFormat, user string) error {
 		ymPath := filepath.Join(root, year, month)
 		os.MkdirAll(ymPath, 666)
 		articlePath := filepath.Join(ymPath, mday) + ".md"
-		//fmt.Fprintln(os.Stderr, filepath.ToSlash(articlePath))
 
 		var fd *os.File
 		if _, ok := createdFile[articlePath]; ok {
@@ -112,8 +113,10 @@ func readTweetJSON(r io.Reader, root, dateFormat, user string) error {
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(os.Stderr, "%s: reopened(for %d tweets)\n",
-				filepath.ToSlash(articlePath), len(tweets))
+			if *flagShowDate {
+				fmt.Fprintf(os.Stderr, "%s: reopened(for %d tweets)\n",
+					filepath.ToSlash(articlePath), len(tweets))
+			}
 		} else {
 			fd, err = os.Create(articlePath)
 			if err != nil {
@@ -174,6 +177,11 @@ func readTweetJs(f *zip.File, skipChar byte, root, dateFormat, user string) erro
 	if err != nil {
 		return err
 	}
+
+	if *flagShowSource {
+		fmt.Fprintf(os.Stderr, "%s: start to parse (skipChar=\"%c\",dateFormat=\"%s\").\n", f.Name, skipChar, dateFormat)
+	}
+
 	return readTweetJSON(br, root, dateFormat, user)
 }
 
@@ -209,6 +217,10 @@ func readZip(zipFname, root string) error {
 		return err
 	}
 	defer z.Close()
+
+	if *flagShowSource {
+		fmt.Fprintf(os.Stderr, "%s: open zip.\n", zipFname)
+	}
 	var username string
 	for _, f := range z.File {
 		if path.Ext(f.Name) != ".js" {
