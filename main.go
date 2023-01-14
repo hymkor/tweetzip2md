@@ -39,6 +39,11 @@ type Tweet struct {
 	User            *User  `json:"user"`
 }
 
+var (
+	flagDir        = flag.String("d", ".", "root directory to output")
+	flagBlobMaster = flag.String("b", ".", "relative path from index to each markdown")
+)
+
 var replaceTable = strings.NewReplacer(
 	"\n", "  \n",
 	"*", "\\*",
@@ -218,10 +223,6 @@ func readZip(zipFname, root string) error {
 	}
 	return nil
 }
-
-var flagDir = flag.String("d", ".", "root directory to output")
-
-var flagBlobMaster = flag.String("b", ".", "relative path from index to each markdown")
 
 func mains(args []string) error {
 	for _, arg1 := range args {
