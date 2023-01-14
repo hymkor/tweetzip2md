@@ -42,7 +42,6 @@ type Tweet struct {
 
 var (
 	flagDir        = flag.String("d", ".", "root directory to output")
-	flagBlobMaster = flag.String("b", ".", "relative path from index to each markdown")
 	flagShowDate   = flag.Bool("show-reopen-date", false, "show date on opening for append")
 	flagShowSource = flag.Bool("show-source-name", false, "show source JSON in zip-file")
 )
@@ -257,7 +256,7 @@ func mains(args []string) error {
 		ms.Reverse(func(m string, ds *btree.Set[string]) bool {
 			fmt.Printf("* %s |", m)
 			ds.Scan(func(d string) bool {
-				fmt.Printf(" [%s](%s.md)", d, path.Join(*flagBlobMaster, y, m, d))
+				fmt.Printf(" [%s](%s.md)", d, path.Join(y, m, d))
 				return true
 			})
 			fmt.Println()
