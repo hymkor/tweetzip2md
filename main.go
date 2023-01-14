@@ -218,7 +218,7 @@ func readZip(zipFname, root string) error {
 			username, err = readAccountJs(f)
 		} else if path.Dir(f.Name) == "data/js/tweets" {
 			err = readTweetJs(f, '\n', root, "2006-01-02 15:04:05 -0700", username)
-		} else if ok, err := filepath.Match(f.Name, "data/tweets-part*.js"); (err == nil && ok) || f.Name == "tweet.js" || f.Name == "data/tweets.js" {
+		} else if ok, err := filepath.Match("data/tweets-part*.js", f.Name); (err == nil && ok) || f.Name == "tweet.js" || f.Name == "data/tweets.js" {
 			err = readTweetJs(f, '=', root, "Mon Jan 02 15:04:05 -0700 2006", username)
 		}
 		if err != nil {
