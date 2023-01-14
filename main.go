@@ -226,7 +226,7 @@ func readZip(zipFname, root string) error {
 		if path.Ext(f.Name) != ".js" {
 			continue
 		}
-		if f.Name == "account.js" {
+		if f.Name == "account.js" || f.Name == "data/account.js" {
 			username, err = readAccountJs(f)
 		} else if path.Dir(f.Name) == "data/js/tweets" {
 			err = readTweetJs(f, '\n', root, "2006-01-02 15:04:05 -0700", username)
