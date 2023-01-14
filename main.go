@@ -37,6 +37,7 @@ type Tweet struct {
 	CreatedAt       string `json:"created_at"`
 	RetweetedStatus *Tweet `json:"retweeted_status"`
 	User            *User  `json:"user"`
+	TweetNewVersion *Tweet `json:"tweet,omitempty"`
 }
 
 var (
@@ -70,6 +71,9 @@ func readTweetJSON(r io.Reader, root, dateFormat, user string) error {
 	var stock btree.Map[string, []Tweet]
 
 	for _, tw := range tweets {
+		if tw.TweetNewVersion != nil {
+			tw = *tw.TweetNewVersion
+		}
 		id64, err := strconv.ParseUint(tw.IdStr, 10, 64)
 		if err != nil {
 			return fmt.Errorf("id_str:\"%s\": %w\n", tw.IdStr, err)
@@ -214,7 +218,7 @@ func readZip(zipFname, root string) error {
 			username, err = readAccountJs(f)
 		} else if path.Dir(f.Name) == "data/js/tweets" {
 			err = readTweetJs(f, '\n', root, "2006-01-02 15:04:05 -0700", username)
-		} else if f.Name == "tweet.js" {
+		} else if ok, err := filepath.Match(f.Name, "data/tweets-part*.js"); (err == nil && ok) || f.Name == "tweet.js" || f.Name == "data/tweets.js" {
 			err = readTweetJs(f, '=', root, "Mon Jan 02 15:04:05 -0700 2006", username)
 		}
 		if err != nil {
